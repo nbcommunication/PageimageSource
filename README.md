@@ -47,7 +47,7 @@ These settings control how the output of `Pageimage::render()` is modified.
 #### Use Lazy Loading?
 When enabled this adds `loading="lazy"` to the `<img>` attributes. It is useful to have this on by default, and you can always override it in the `options` for a specific image.
 
-#### Use the <picture> element?
+#### Use the `<picture>` element?
 When enabled, the `<img>` element is wrapped in a `<picture>` element and `<source>` elements for original and WebP variations are provided. This requires WebP to be enabled. For more information on what this does, have a look at the examples in `Pageimage::render()` below.
 
 ### Remove Variations
@@ -183,7 +183,7 @@ Assuming a default set of `480, 960` and lazy loading enabled, here are some exa
 </figure>
 ```
 
-**<picture> enabled**
+**`<picture>` enabled**
 ```html
 <figure class="align_right hidpi">
 	<a href="/site/assets/files/1/example.jpg">
