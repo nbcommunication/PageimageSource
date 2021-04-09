@@ -1,0 +1,170 @@
+<?php namespace ProcessWire;
+
+/**
+ * Textformatter Pageimage Source
+ *
+ * #pw-summary Update JPG/PNG image references with your Pageimage Source configuration.
+ * #pw-body Based on TextformatterWebpImages by Ryan Cramer.
+ *
+ * @copyright 2021 NB Communication Ltd
+ * @license Mozilla Public License v2.0 http://mozilla.org/MPL/2.0/
+ *
+ */
+
+class TextformatterPageimageSource extends Textformatter implements Module {
+
+	/**
+	 * getModuleInfo is a module required by all modules to tell ProcessWire about them
+	 *
+	 * @return array
+	 *
+	 */
+	public static function getModuleInfo() {
+		return [
+			'title' => 'Textformatter Pageimage Source',
+			'version' => 010,
+			'summary' => 'Update JPG/PNG image references with your Pageimage Source configuration.',
+			'author' => 'nbcommunication',
+			'href' => 'https://github.com/nbcommunication/PageimageSource',
+			'icon' => 'picture-o',
+			'requires' => 'PageimageSource',
+		];
+	}
+
+	/**
+	 * Last page ID that called this module
+	 *
+	 * @var int
+	 *
+	 */
+	protected $cursor = 0;
+
+	/**
+	 * Image fields indexed by page ID (reset on every call to formatValue that changes the page ID)
+	 *
+	 * @var array
+	 *
+	 */
+	protected $imageFields = [];
+
+	/**
+	 * Cache of replacements indexed by page ID (reset on every call to formatValue that changes the page ID)
+	 *
+	 * @var array
+	 *
+	 */
+	protected $replacements = [];
+
+	/**
+	 * Format the given $value for the given $page $field
+	 *
+	 * @param Page $page
+	 * @param Field $field
+	 * @param string $value
+	 *
+	 */
+	public function formatValue(Page $page, Field $field, &$value) {
+
+		if($this->cursor !== $page->id) {
+			$this->imageFields = [];
+			$this->replacements = [];
+		}
+
+		$urlFiles = $this->wire('config')->urls('files');
+		$exts = ['jpeg', 'jpg', 'png'];
+
+		$this->cursor = $page->id;
+		$cacheKey = "$field.$page";
+
+		if(isset($this->replacements[$cacheKey])) {
+
+			$replacements = $this->replacements[$cacheKey];
+
+		} else {
+
+			$replacements = [];
+
+			// Do any image references with this ext appear in value?
+			foreach($exts as $key => $ext) {
+				if(strpos($value, ".$ext") === false) unset($exts[$key]);
+			}
+
+			// If no images then exit
+			if(!count($exts)) return;
+
+			// Find all <img> elements referenced
+			if(!preg_match_all(
+				'/<img.*?src="(' . str_replace('/', '\/', $urlFiles) . '\d+\/.*?\.(' . implode('|', $exts) . '))".*?>/',
+				$value,
+				$matches
+			)) return;
+
+			foreach($matches[0] as $key => $fullMatch) {
+
+				$matchUrl = $matches[1][$key];
+
+				// If image exists somewhere outside our files, skip
+				if(strpos($matchUrl, $urlFiles) !== 0) continue;
+
+				// Determine page id that owns file from its URL
+				$id = str_replace($urlFiles, '', dirname($matchUrl));
+
+				// If extended paths are in use, remove slashes
+				if(strpos($id, '/') !== false) $id = str_replace('/', '', $id);
+
+				// Get page from the id
+				$id = (int) $id;
+				$p = $id === $page->id ? $page : $this->wire('pages')->get($id);
+
+				// If the page isn't a page, skip
+				if(!$p->id) continue;
+
+				// Get the image fields for this page
+				if(isset($this->imageFields[$p->id])) {
+
+					$imageFields = $this->imageFields[$p->id];
+
+				} else {
+
+					$imageFields = [];
+
+					foreach($p->template->fieldgroup as $field) {
+						if(!$field->type instanceof FieldtypeImage) continue;
+						$v = $p->get($field->name);
+						if(empty($v)) continue;
+						if($v instanceof Pageimage) $v = $v->pagefiles;
+						if(!$v instanceof Pageimages) continue;
+						if(!$v->count()) continue;
+						$imageFields[$field->name] = $v;
+					}
+
+					$this->imageFields[$p->id] = $imageFields;
+				}
+
+				$image = null;
+				$filename = basename($matchUrl);
+
+				foreach($imageFields as $images) {
+					$image = $images->getFile($filename);
+					if(!$image) continue;
+				}
+
+				if($image instanceof Pageimage) {
+					// Resize if a variation
+					if(preg_match('/\.(\d+)x(\d+)(.*?)\./', $filename, $dimensions)) {
+						$image = $image->size((int) $dimensions[1] ?: 0, (int) $dimensions[2] ?: 0, [
+							'hidpi' => strpos($dimensions[3] ?? '', 'hidpi') !== false,
+						]);
+					}
+					$replacements[$fullMatch] = $image->render(str_replace($matchUrl, '{url}', $fullMatch));
+				}
+			}
+
+			$this->replacements[$cacheKey] = $replacements;
+		}
+
+		if(count($replacements)) {
+			$value = str_replace(array_keys($replacements), array_values($replacements), $value);
+		}
+	}
+}
