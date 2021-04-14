@@ -28,7 +28,7 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 	public static function getModuleInfo() {
 		return [
 			'title' => 'Pageimage Source',
-			'version' => 010,
+			'version' => 100,
 			'summary' => 'Extends Pageimage with a srcset property/method and additional rendering options.',
 			'author' => 'nbcommunication',
 			'href' => 'https://github.com/nbcommunication/PageimageSource',
