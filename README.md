@@ -95,7 +95,7 @@ This module extends the options available to this method with:
 - `srcset`: When the module is installed, this will always be added, unless set to `false`. Any values in the formats described above can be passed.
 - `sizes`: If no sizes are specified, a default of `100vw` is assumed.
 - `lazy`: Pass `true` to add loading=lazy, otherwise `false` to disable if enabled in the module configuration.
-- `picture`: Pass `true` to use the `<picture>` element, otherwise `false` to disable if enabled in the module configuration.
+- `picture`: Pass `true` to use the `<picture>` element, otherwise `false` to disable if enabled in the module configuration. Alternatively, you can pass a `<picture>` tag with any additional attributes you wish to use.
 
 Please refer to the [API Reference](https://processwire.com/api/ref/pageimage/render/) for more information about this method.
 
