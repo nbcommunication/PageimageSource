@@ -30,8 +30,8 @@ class PageimageSourceConfig extends ModuleConfig {
 	 */
 	public function getInputfields() {
 
-		$config = $this->wire('config');
-		$modules = $this->wire('modules');
+		$config = $this->wire()->config;
+		$modules = $this->wire()->modules;
 
 		$inputfields = parent::getInputfields();
 
@@ -62,8 +62,8 @@ class PageimageSourceConfig extends ModuleConfig {
 			// Get defaultSets as a string and order correctly
 			$args = explode("\n", $module->defaultSets);
 			usort($args, function($a, $b) {
-				$s = $this->wire('sanitizer');
-				return $s->int(explode(' ', $a)[0]) <=> $s->int(explode(' ', $b)[0]);
+				$sanitizer = $this->wire()->sanitizer;
+				return $sanitizer->int(explode(' ', $a)[0]) <=> $sanitizer->int(explode(' ', $b)[0]);
 			});
 
 			$preview .= $a2nl([
@@ -94,7 +94,7 @@ class PageimageSourceConfig extends ModuleConfig {
 			'name' => 'defaultSets',
 			'label' => $this->_('Default Set Rules'),
 			'placeholder' => $example,
-			'required' => !$this->wire('input')->post->bool('uninstall'),
+			'required' => !$this->wire()->input->post->bool('uninstall'),
 			'notes' => $this->_('Each set rule should be entered on a new line.'),
 			'icon' => 'arrows-alt',
 			'rows' => substr_count($preview, "\n"), // Adjust the textarea based on preview
@@ -106,11 +106,20 @@ class PageimageSourceConfig extends ModuleConfig {
 			'name' => 'previewSets',
 			'label' => $this->_('Preview'),
 			'value' => "<pre class=language-php><code class=language-php>$preview</code></pre>",
-			'notes' => $this->_('A set will only be generated if the original image is wider or higher than the set dimensions.'),
+			'notes' => $this->_('A set rule will only be used if the original image is wider or higher than the set dimensions.'),
 			'icon' => 'eye',
 			'columnWidth' => 50,
 		]);
 
+		$inputfields->add([
+			'type' => 'checkbox',
+			'name' => 'allSets',
+			'label' => $this->_('Use for all dimensions?'),
+			'value' => 1,
+			'notes' => $this->_('If enabled, a set rule will be used regardless of whether it is wider or higher than the dimensions of the original image.'),
+			'icon' => 'object-group',
+			'collapsed' => 2,
+		]);
 
 		$toggle = $modules->isInstalled('InputfieldToggle') ? 'toggle' : 'checkbox';
 
