@@ -21,9 +21,9 @@ These are the default set rules that will be used when none are specified, e.g. 
 
 Each set rule should be entered on a new line, in the format `{width}x{height} {inherentwidth}w|{resolution}x`.
 
-Not all arguments are required - you will probably find that specifying the width is sufficient for most cases. Here's a few examples of valid set rules and the sets they generate:
+Not all arguments are required - you will probably find that specifying the width is sufficient for most cases. Here's a few examples of valid set rules and the srcsets they generate:
 
-Set Rule | Set Generated | Arguments Used
+Set Rule | Srcset Generated | Arguments Used
 --- | --- | ---
 320 | image.320x0-srcset.jpg 320w | `{width}`
 480x540 | image.480x540-srcset.jpg 480w | `{width}x{height}`
@@ -32,7 +32,20 @@ Set Rule | Set Generated | Arguments Used
 
 How you configure your rules is dependent on the needs of the site you are developing; there are no prescriptive rules that will meet the needs of most situations. [This article](https://medium.com/hceverything/applying-srcset-choosing-the-right-sizes-for-responsive-images-at-different-breakpoints-a0433450a4a3) gives a good overview of some of the things to consider.
 
-When you save your rules, a preview of the sets generated and an equivalent method call will be displayed to the right. Invalid rules will not be used, and you will be notified of this.
+When you save your rules, a preview of the srcset generated and an equivalent method call will be displayed to the right. Invalid rules will not be used, and you will be notified of this.
+
+### Use for all dimensions?
+If enabled, a set rule will be used regardless of whether it is wider or higher than the dimensions of the original image.
+
+To use this on a `srcset` call, enable the `allSets` option:
+```php
+$srcset = $image->srcset('4096, 2048, 1024, 512, 256', [
+	'allSets' => true,
+]);
+// If passing an image 2000px in width, the above would return a srcset with set rules for each given width
+// Without 'allSets' enabled, the srcset generation would terminate at 4096w
+```
+
 
 ### WebP
 If enabled, WebP versions of the image and srcset variations will be generated and these will be returned by `Pageimage::srcset()`. As with the default implementation, the image with the smaller file size is returned. In most cases this is the WebP version, but sometimes can be the source.
