@@ -6,7 +6,7 @@
  * #pw-summary Update JPG/PNG image references with your Pageimage Source configuration.
  * #pw-body Based on TextformatterWebpImages by Ryan Cramer.
  *
- * @copyright 2021 NB Communication Ltd
+ * @copyright 2022 NB Communication Ltd
  * @license Mozilla Public License v2.0 http://mozilla.org/MPL/2.0/
  *
  */
@@ -70,7 +70,7 @@ class TextformatterPageimageSource extends Textformatter implements Module {
 			$this->replacements = [];
 		}
 
-		$urlFiles = $this->wire('config')->urls('files');
+		$urlFiles = $this->wire()->config->urls('files');
 		$exts = ['jpeg', 'jpg', 'png'];
 
 		$this->cursor = $page->id;
@@ -114,7 +114,7 @@ class TextformatterPageimageSource extends Textformatter implements Module {
 
 				// Get page from the id
 				$id = (int) $id;
-				$p = $id === $page->id ? $page : $this->wire('pages')->get($id);
+				$p = $id === $page->id ? $page : $this->wire()->pages->get($id);
 
 				// If the page isn't a page, skip
 				if(!$p->id) continue;
