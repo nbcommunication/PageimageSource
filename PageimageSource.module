@@ -9,6 +9,7 @@
  * @license Mozilla Public License v2.0 http://mozilla.org/MPL/2.0/
  *
  * @property string $defaultSets
+ * @property bool $allSets
  * @property bool $webp
  * @property int $webpQuality
  * @property bool $useLazy
@@ -28,7 +29,7 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 	public static function getModuleInfo() {
 		return [
 			'title' => 'Pageimage Source',
-			'version' => 103,
+			'version' => 104,
 			'summary' => 'Extends Pageimage with a srcset property/method and additional rendering options.',
 			'author' => 'nbcommunication',
 			'href' => 'https://github.com/nbcommunication/PageimageSource',
@@ -63,8 +64,8 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 	 */
 	public function init() {
 
-		$input = $this->wire('input');
-		$isAdmin = $this->wire('page')->template->name === 'admin';
+		$input = $this->wire()->input;
+		$isAdmin = $this->wire()->page->template->name === 'admin';
 
 		// Get and set image srcset widths
 		if($this->defaultSets) {
@@ -82,14 +83,14 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 			if($input->post->bool('removeVariations')) {
 				// Remove srcset variations if requested
 				$count = 0;
-				$dirs = new \DirectoryIterator($this->wire('config')->paths->files);
+				$dirs = new \DirectoryIterator($this->wire()->config->paths->files);
 				foreach($dirs as $dir) {
 					if($dir->isFile() || $dir->isDot()) continue;
 					$dir = new \DirectoryIterator($dir->getPathname());
 					foreach($dir as $file) {
 						if(strpos($file->getFilename(), '-' . self::suffix . '.') !== false) {
 							$count++;
-							$this->wire('files')->unlink($file->getPathname());
+							$this->wire()->files->unlink($file->getPathname());
 						}
 					}
 				}
@@ -138,7 +139,7 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 	 */
 	public function ___getImageSrcset(HookEvent $event) {
 
-		$sanitizer = $this->wire('sanitizer');
+		$sanitizer = $this->wire()->sanitizer;
 
 		$image = $event->object;
 		$name = $image->basename;
@@ -160,11 +161,16 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 
 		// Set default size options
 		$options = array_merge([
+			'allSets' => (bool) $this->allSets,
 			'suffix' => self::suffix,
 			'upscaling' => false,
 			'webpAdd' => $this->webp,
 			'webpQuality' => $this->webpQuality,
 		], $options);
+
+		if($options['allSets']) {
+			$options['upscaling'] = true;
+		}
 
 		// Image Parameters
 		$imageWidth = $image->width;
@@ -251,7 +257,7 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 
 			// Add set
 			if(!isset($sets[$rule])) $sets[$rule] = "{$img->$property} $rule";
-			if($break) break;
+			if($break && !$options['allSets']) break;
 		}
 
 		$event->return = count($sets) ? implode(', ', $sets) : '';
@@ -285,6 +291,8 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 	 *
 	 */
 	public function render(HookEvent $event) {
+
+		$config = $this->wire()->config;
 
 		$image = $event->object;
 		$img = $event->return;
@@ -329,19 +337,19 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 
 		$apos = strpos($img, '"') === false ? "'" : '"';
 
-		$isAttr = function($a) {
+		$_isAttr = function($a) {
 			return !empty($a) && is_string($a);
 		};
 
-		$hasAttr = function($a) use ($img) {
+		$_hasAttr = function($a) use ($img) {
 			return strpos($img, "$a=") !== false;
 		};
 
-		$getSrcset = function($webp = null) use ($image, $options) {
+		$_getSrcset = function($webp = null) use ($config, $image, $options) {
 			$_webp = $this->webp;
-			$webpOptions = $this->wire('config')->webpOptions();
+			$webpOptions = $config->webpOptions();
 			if(is_bool($webp)) {
-				$this->wire('config')->webpOptions([
+				$config->webpOptions([
 					'useSrcUrlOnSize' => false,
 					'useSrcUrlOnFail' => false,
 				]);
@@ -356,32 +364,32 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 				}
 			}
 			$this->webp = $_webp;
-			$this->wire('config')->webpOptions($webpOptions);
+			$config->webpOptions($webpOptions);
 			return $srcset;
 		};
 
 		if(!$options['picture']) {
 
 			// srcset
-			$srcset = $getSrcset();
-			if($hasAttr('srcset')) {
+			$srcset = $_getSrcset();
+			if($_hasAttr('srcset')) {
 				$replacements['srcset'] = $srcset;
-			} else if($isAttr($srcset)) {
+			} else if($_isAttr($srcset)) {
 				$attributes[] = "srcset=$apos{$srcset}$apos";
 			}
 
 			// sizes
-			if($hasAttr('sizes')) {
+			if($_hasAttr('sizes')) {
 				$replacements['sizes'] = $options['sizes'];
-			} else if($isAttr($options['sizes']) && $srcset) {
+			} else if($_isAttr($options['sizes']) && $srcset) {
 				$attributes[] = "sizes=$apos{$options['sizes']}$apos";
 			}
 		}
 
 		// lazy loading
-		if($hasAttr('loading')) {
+		if($_hasAttr('loading')) {
 			$replacements['loading'] = $options['lazy'] ?: '';
-		} else if($isAttr($options['lazy'])) {
+		} else if($_isAttr($options['lazy'])) {
 			$attributes[] = "loading=$apos{$options['lazy']}$apos";
 		}
 
@@ -403,14 +411,14 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 				$options['picture'] :
 				'<picture>'
 			) .
-				'<source srcset="' . $getSrcset(true) . '" sizes="' . $options['sizes'] . '" type="image/webp">' .
-				'<source srcset="' . $getSrcset(false) . '" sizes="' . $options['sizes'] . '" type="image/' .
+				'<source srcset="' . $_getSrcset(true) . '" sizes="' . $options['sizes'] . '" type="image/webp">' .
+				'<source srcset="' . $_getSrcset(false) . '" sizes="' . $options['sizes'] . '" type="image/' .
 					($image->ext === 'jpg' ? 'jpeg' : $image->ext) . '">' .
 			"{$img}</picture>";
 
 		} else if ($this->webp) {
 			if($this->webpQuality) {
-				$this->wire('config')->webpOptions('quality', $this->webpQuality);
+				$config->webpOptions('quality', $this->webpQuality);
 			}
 			$img = str_replace($image->url, $image->webpUrl, $img);
 		}
@@ -440,8 +448,8 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 			$sets = explode("\n", str_replace(',', "\n", (is_string($sets) ? $sets : $this->defaultSets)));
 		}
 
-		$input = $this->wire('input');
-		$sanitizer = $this->wire('sanitizer');
+		$input = $this->wire()->input;
+		$sanitizer = $this->wire()->sanitizer;
 
 		$srcset = [];
 		$errors = [];
