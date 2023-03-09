@@ -94,7 +94,7 @@ class TextformatterPageimageSource extends Textformatter implements Module {
 
 			// Find all <img> elements referenced
 			if(!preg_match_all(
-				'/<img.*?src="(' . str_replace('/', '\/', $urlFiles) . '\d+\/.*?\.(' . implode('|', $exts) . '))".*?>/',
+				'/<img.*?src=["|\'](' . str_replace('/', '\/', $urlFiles) . '\d+\/.*?\.(' . implode('|', $exts) . '))["|\'].*?>/',
 				$value,
 				$matches
 			)) return;
