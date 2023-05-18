@@ -314,6 +314,7 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 			'lazy' => $this->useLazy,
 			'picture' => $this->usePicture,
 			'useSrcUrlOnSize' => false,
+			'attrs' => []
 		], $options);
 
 		$_webp = $this->webp;
@@ -332,7 +333,7 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 			$image = $image->size((int) $w, (int) $h, $options);
 		}
 
-		$attributes = [];
+		$attributes = is_array($options['attrs']) ? $options['attrs'] : [];
 		$replacements = [];
 
 		$apos = strpos($img, '"') === false ? "'" : '"';
