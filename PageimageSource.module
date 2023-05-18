@@ -314,6 +314,7 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 			'lazy' => $this->useLazy,
 			'picture' => $this->usePicture,
 			'useSrcUrlOnSize' => false,
+			'attrs' => []
 		], $options);
 
 		$_webp = $this->webp;
@@ -331,8 +332,8 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 			$original = $image;
 			$image = $image->size((int) $w, (int) $h, $options);
 		}
-
-		$attributes = [];
+		
+		$attributes = is_array($options['attrs']) ? $options['attrs'] : [];
 		$replacements = [];
 
 		$apos = strpos($img, '"') === false ? "'" : '"';
@@ -375,14 +376,14 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 			if($_hasAttr('srcset')) {
 				$replacements['srcset'] = $srcset;
 			} else if($_isAttr($srcset)) {
-				$attributes[] = "srcset=$apos{$srcset}$apos";
+				$attributes['srcset'] = $srcset;
 			}
 
 			// sizes
 			if($_hasAttr('sizes')) {
 				$replacements['sizes'] = $options['sizes'];
 			} else if($_isAttr($options['sizes']) && $srcset) {
-				$attributes[] = "sizes=$apos{$options['sizes']}$apos";
+				$attributes['sizes'] = $options['sizes'];
 			}
 		}
 
@@ -390,12 +391,12 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 		if($_hasAttr('loading')) {
 			$replacements['loading'] = $options['lazy'] ?: '';
 		} else if($_isAttr($options['lazy'])) {
-			$attributes[] = "loading=$apos{$options['lazy']}$apos";
+			$attributes['loading'] = $options['lazy'];
 		}
 
 		// Add attributes
 		if(count($attributes)) {
-			$img = rtrim($img, ' />') . ' ' . implode(' ', $attributes) . '>';
+			$img = rtrim($img, ' />') . ' ' . $this->attrs($attributes) . '>';
 		}
 
 		// Replace tags
@@ -524,5 +525,16 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 	private function isArrayAssociative(array $array) {
 		if(array() === $array) return false;
 		return array_keys($array) !== range(0, count($array) - 1);
+	}
+
+	private function attrs(array $attrs) {
+		$attributes = '';
+		foreach ($attrs as $attr => $value) {
+			if (is_array($value)) {
+				$value = implode(' ', $value);
+			}
+			$attributes .= sprintf('%s="%s" ', $attr, htmlspecialchars($value));
+		}
+		return trim($attributes);
 	}
 }
