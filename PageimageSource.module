@@ -5,7 +5,7 @@
  *
  * #pw-summary Extends Pageimage with a srcset property/method plus additional rendering options.
  *
- * @copyright 2022 NB Communication Ltd
+ * @copyright 2023 NB Communication Ltd
  * @license Mozilla Public License v2.0 http://mozilla.org/MPL/2.0/
  *
  * @property string $defaultSets
@@ -29,7 +29,7 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 	public static function getModuleInfo() {
 		return [
 			'title' => 'Pageimage Source',
-			'version' => 104,
+			'version' => 105,
 			'summary' => 'Extends Pageimage with a srcset property/method and additional rendering options.',
 			'author' => 'nbcommunication',
 			'href' => 'https://github.com/nbcommunication/PageimageSource',
@@ -239,7 +239,10 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 					}
 				}
 
-				if(is_null($img) && $image->width > $cropWidth) {
+				if(is_null($img) && (
+					($cropWidth && $image->width > $cropWidth) ||
+					($cropHeight && $image->height > $cropHeight)
+				)) {
 					$img = $image->size($cropWidth, $cropHeight, $options);
 				}
 
