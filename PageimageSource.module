@@ -29,7 +29,7 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 	public static function getModuleInfo() {
 		return [
 			'title' => 'Pageimage Source',
-			'version' => 106,
+			'version' => 107,
 			'summary' => 'Extends Pageimage with a srcset property/method and additional rendering options.',
 			'author' => 'nbcommunication',
 			'href' => 'https://github.com/nbcommunication/PageimageSource',
@@ -64,16 +64,15 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 	 */
 	public function init() {
 
-		$input = $this->wire()->input;
-		$isAdmin = $this->wire()->page->template->name === 'admin';
-
 		// Get and set image srcset widths
 		if($this->defaultSets) {
 			$this->srcset = $this->getSrcset();
 		}
 
 		// If module config loaded
-		if($isAdmin) {
+		if((string) $this->wire()->process === 'ProcessModule') {
+
+			$input = $this->wire()->input;
 
 			if(!$this->defaultSets && !$input->post->textarea('defaultSets') && !$input->post->bool('uninstall')) {
 				$this->error($this->_('Please enter a srcset configuration.'));
@@ -241,11 +240,14 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 
 				if(is_null($img) && (
 					($cropWidth && $image->width > $cropWidth) ||
-					($cropHeight && $image->height > $cropHeight) ||
-					($options['upscaling'] && $cropWidth && $cropHeight)
+					($cropHeight && $image->height > $cropHeight)
 				)) {
 					$img = $image->size($cropWidth, $cropHeight, $options);
 				}
+
+			} else if($options['allSets'] && $options['upscaling'] && $cropWidth && $cropHeight) {
+
+				$img = $image->size($cropWidth, $cropHeight, $options);
 
 			} else if($cropHeight && $imageHeight > $cropHeight) {
 
