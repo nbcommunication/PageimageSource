@@ -29,7 +29,7 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 	public static function getModuleInfo() {
 		return [
 			'title' => 'Pageimage Source',
-			'version' => 107,
+			'version' => 108,
 			'summary' => 'Extends Pageimage with a srcset property/method and additional rendering options.',
 			'author' => 'nbcommunication',
 			'href' => 'https://github.com/nbcommunication/PageimageSource',
@@ -141,7 +141,6 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 		$sanitizer = $this->wire()->sanitizer;
 
 		$image = $event->object;
-		$name = $image->basename;
 		$srcset = $event->arguments(0);
 		$options = $event->arguments(1);
 		$property = [
@@ -177,7 +176,7 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 		$ratio = $imageWidth && $imageHeight ? $imageWidth / $imageHeight : 1;
 
 		// Handle image variations
-		$variation = $image->isVariation($name, ['allowSelf' => true]);
+		$variation = $image->isVariation($image->basename, ['allowSelf' => true]);
 		if($variation) {
 			// Image is a variation, get original and variant dimensions
 			$image = $image->getOriginal();
@@ -192,11 +191,8 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 			$cropWidth = $sanitizer->int($dimensions[0]);
 			$cropHeight = $sanitizer->int($dimensions[1] ?? 0);
 
-			$wider = $imageWidth > $cropWidth;
-			$higher = $imageHeight > $cropHeight;
-
 			$img = null;
-			if(($cropWidth || $cropHeight) && ($wider || $higher)) {
+			if(($cropWidth || $cropHeight) && (($cropWidth && $imageWidth > $cropWidth) || ($cropHeight && $imageHeight > $cropHeight))) {
 
 				if(!$options['upscaling']) {
 					if($imageWidth && $cropWidth > $imageWidth) {
@@ -422,7 +418,7 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 					($image->ext === 'jpg' ? 'jpeg' : $image->ext) . '">' .
 			"{$img}</picture>";
 
-		} else if ($this->webp) {
+		} else if($this->webp) {
 			if($this->webpQuality) {
 				$config->webpOptions('quality', $this->webpQuality);
 			}

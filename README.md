@@ -44,6 +44,15 @@ $srcset = $image->srcset('4096, 2048, 1024, 512, 256', [
 ]);
 // If passing an image 2000px in width, the above would return a srcset with set rules for each given width
 // Without 'allSets' enabled, the srcset generation would terminate at 4096w
+// Equivalent render()
+$rendered = $image->render([
+	'srcset' => [
+		'rules' => '4096, 2048, 1024, 512, 256',
+		'options' => [
+			'allSets' => true,
+		],
+ 	],
+]);
 ```
 
 
@@ -135,6 +144,18 @@ echo $image->render(['srcset' => '480, 1240x640']);
 	<img src="image.jpg" alt="" loading="lazy">
 </picture>
 */
+
+// Please note, if upscaling is off and your original image is smaller than a set rule, it will not be used exactly.
+// For example, an image 1080px wide would generate 'image.1080x640-srcset.ext' above.
+// Turn on upscaling
+$image->render([
+	'srcset' => [
+		'rules' => '480, 1240x640',
+		'options' => [
+			'upscaling' => true,
+		],
+	],
+]);
 
 // Render an image using custom set rules and sizes
 // Also use the `markup` argument
