@@ -414,13 +414,22 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 
 		if($options['picture']) {
 
+			$attrsWebp = '';
+			$attrs = '';
+			if($options['srcset']) {
+				$attrsWebp = 'srcset="' . $_getSrcset(true) . '" sizes="' . $options['sizes'] . '"';
+				$attrs = 'srcset="' . $_getSrcset(false) . '" sizes="' . $options['sizes'] . '"';
+			} else {
+				$attrsWebp = 'src="' . $image->webpUrl . '"';
+				$attrs = 'src="' . $image->url . '"';
+			}
+
 			$img = (is_string($options['picture']) && substr($options['picture'], 0, 8) === '<picture' ?
 				$options['picture'] :
 				'<picture>'
 			) .
-				'<source srcset="' . $_getSrcset(true) . '" sizes="' . $options['sizes'] . '" type="image/webp">' .
-				'<source srcset="' . $_getSrcset(false) . '" sizes="' . $options['sizes'] . '" type="image/' .
-					($image->ext === 'jpg' ? 'jpeg' : $image->ext) . '">' .
+				'<source ' . $attrsWebp . ' type="image/webp">' .
+				'<source ' . $attrs . ' type="image/' .($image->ext === 'jpg' ? 'jpeg' : $image->ext) . '">' .
 			"{$img}</picture>";
 
 		} else if($this->webp) {
