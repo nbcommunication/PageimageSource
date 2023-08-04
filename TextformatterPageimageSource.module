@@ -150,13 +150,51 @@ class TextformatterPageimageSource extends Textformatter implements Module {
 				}
 
 				if($image instanceof Pageimage) {
+
+					$attrs = ['width', 'height'];
+					$original = [];
+					$variation = [];
+
+					foreach($attrs as $attr) {
+
+						$original[$attr] = $image->get($attr);
+
+						if(preg_match('/' . $attr . '="(\d*?)"/', $fullMatch, $attrMatches)) {
+							$variation[$attr] = (int) $attrMatches[1];
+						} else {
+							$variation[$attr] = 0;
+						}
+					}
+
 					// Resize if a variation
 					if(preg_match('/\.(\d+)x(\d+)(.*?)\./', $filename, $dimensions)) {
 						$image = $image->size((int) $dimensions[1] ?: 0, (int) $dimensions[2] ?: 0, [
 							'hidpi' => strpos($dimensions[3] ?? '', 'hidpi') !== false,
 						]);
+					} else if(array_sum($variation)) {
+						$image = $image->size($variation['width'], $variation['height']);
 					}
-					$replacements[$fullMatch] = $image->render(str_replace($matchUrl, '{url}', $fullMatch));
+
+					// Work out the missing dimensions
+					if(!$variation['width'] && $variation['height']) {
+						$variation['width'] = round(($original['width'] / $original['height']) * $variation['height']);
+					}
+
+					if(!$variation['height'] && $variation['width']) {
+						$variation['height'] = round(($original['height'] / $original['width']) * $variation['width']);
+					}
+
+					// Add width and height to the render template if not already there
+					// Also add data attributes with the original dimensions
+					$tpl = str_replace($matchUrl, '{url}', $fullMatch);
+					foreach($attrs as $attr) {
+						if(!preg_match('/' . $attr . '="\d*?"/', $tpl, $tplMatches)) {
+							$tpl = str_replace(['">', '" />'], '" ' . $attr . '="' . $variation[$attr] . '">', $tpl);
+						}
+						$tpl = str_replace(['">', '" />'], '" data-' . $attr . '="' . $original[$attr] . '">', $tpl);
+					}
+
+					$replacements[$fullMatch] = $image->render($tpl);
 				}
 			}
 
