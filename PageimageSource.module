@@ -5,7 +5,7 @@
  *
  * #pw-summary Extends Pageimage with a srcset property/method plus additional rendering options.
  *
- * @copyright 2023 NB Communication Ltd
+ * @copyright 2024 NB Communication Ltd
  * @license Mozilla Public License v2.0 http://mozilla.org/MPL/2.0/
  *
  * @property string $defaultSets
@@ -29,7 +29,7 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 	public static function getModuleInfo() {
 		return [
 			'title' => 'Pageimage Source',
-			'version' => 110,
+			'version' => 111,
 			'summary' => 'Extends Pageimage with a srcset property/method and additional rendering options.',
 			'author' => 'nbcommunication',
 			'href' => 'https://github.com/nbcommunication/PageimageSource',
@@ -420,8 +420,8 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 				$attrsWebp = 'srcset="' . $_getSrcset(true) . '" sizes="' . $options['sizes'] . '"';
 				$attrs = 'srcset="' . $_getSrcset(false) . '" sizes="' . $options['sizes'] . '"';
 			} else {
-				$attrsWebp = 'src="' . $image->webpUrl . '"';
-				$attrs = 'src="' . $image->url . '"';
+				$attrsWebp = 'srcset="' . $image->webpUrl . '"';
+				$attrs = 'srcset="' . $image->url . '"';
 			}
 
 			$img = (is_string($options['picture']) && substr($options['picture'], 0, 8) === '<picture' ?
