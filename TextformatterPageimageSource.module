@@ -146,7 +146,7 @@ class TextformatterPageimageSource extends Textformatter implements Module {
 
 				foreach($imageFields as $images) {
 					$image = $images->getFile($filename);
-					if(!$image) continue;
+					if($image) break;
 				}
 
 				if($image instanceof Pageimage) {
