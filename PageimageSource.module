@@ -5,7 +5,7 @@
  *
  * #pw-summary Extends Pageimage with a srcset property/method plus additional rendering options.
  *
- * @copyright 2024 NB Communication Ltd
+ * @copyright 2025 NB Communication Ltd
  * @license Mozilla Public License v2.0 http://mozilla.org/MPL/2.0/
  *
  * @property string $defaultSets
@@ -29,7 +29,7 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 	public static function getModuleInfo() {
 		return [
 			'title' => 'Pageimage Source',
-			'version' => 112,
+			'version' => 113,
 			'summary' => 'Extends Pageimage with a srcset property/method and additional rendering options.',
 			'author' => 'nbcommunication',
 			'href' => 'https://github.com/nbcommunication/PageimageSource',
@@ -326,6 +326,10 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 		$_webp = $this->webp;
 		if(!in_array($image->ext, ['jpeg', 'jpg', 'png'])) $this->webp = false;
 
+		if($this->webp && $this->webpQuality) {
+			$config->webpOptions('quality', $this->webpQuality);
+		}
+
 		if($options['useSrcUrlOnSize'] && strpos($image->webp()->url, '.webp') === false) $this->webp = false;
 
 		if(is_array($options['sizes'])) {
@@ -437,9 +441,7 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 			"{$img}</picture>";
 
 		} else if($this->webp) {
-			if($this->webpQuality) {
-				$config->webpOptions('quality', $this->webpQuality);
-			}
+
 			$img = str_replace($image->url, $image->webpUrl, $img);
 		}
 
