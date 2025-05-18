@@ -29,7 +29,7 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 	public static function getModuleInfo() {
 		return [
 			'title' => 'Pageimage Source',
-			'version' => 113,
+			'version' => 114,
 			'summary' => 'Extends Pageimage with a srcset property/method and additional rendering options.',
 			'author' => 'nbcommunication',
 			'href' => 'https://github.com/nbcommunication/PageimageSource',
@@ -253,6 +253,8 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 			if(is_null($img)) {
 
 				$img = $event->object;
+				// Use the original image but apply options
+				$img = $img->size($img->width, $img->height, $options);
 				// No need for more sets
 				$break = !$cropHeight;
 				if($break && substr($rule, -1) === 'w') {
