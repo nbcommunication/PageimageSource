@@ -29,7 +29,7 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 	public static function getModuleInfo() {
 		return [
 			'title' => 'Pageimage Source',
-			'version' => 114,
+			'version' => 115,
 			'summary' => 'Extends Pageimage with a srcset property/method and additional rendering options.',
 			'author' => 'nbcommunication',
 			'href' => 'https://github.com/nbcommunication/PageimageSource',
@@ -163,8 +163,11 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 			'suffix' => self::suffix,
 			'upscaling' => false,
 			'webpAdd' => $this->webp,
-			'webpQuality' => $this->webpQuality,
 		], $options);
+
+		if($this->webpQuality && !isset($options['webpQuality'])) {
+			$options['webpQuality'] = $this->webpQuality;
+		}
 
 		if($options['allSets']) {
 			$options['upscaling'] = true;
