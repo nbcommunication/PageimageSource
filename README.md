@@ -232,6 +232,10 @@ Assuming a default set of `480, 960` and lazy loading enabled, here are some exa
 
 Because the variation is small - 300px wide - the `srcset` only returns the source image variation at the lowest set width (480w). If the source image was > 1000px wide, there would be a variation at both 480w and 960w.
 
+## Compatibility
+
+Please note that this module is not fully compatible with [`DelayedImageVariations`](https://processwire.com/modules/delayed-image-variations), leading to unexpected behaviour with the generation of variations. It has also not been tested with other modules that extend ProcessWire's image functionality, so should be used with caution (and careful testing) if combined with any of these.
+
 ## PageimageSrcset
 
 This module is built upon work done for [`PageimageSrcset`](https://github.com/nbcommunication/PageimageSrcset), which can be considered a first iteration of this module, and is now deprecated.
