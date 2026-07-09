@@ -29,7 +29,7 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 	public static function getModuleInfo() {
 		return [
 			'title' => 'Pageimage Source',
-			'version' => 115,
+			'version' => 116,
 			'summary' => 'Extends Pageimage with a srcset property/method and additional rendering options.',
 			'author' => 'nbcommunication',
 			'href' => 'https://github.com/nbcommunication/PageimageSource',
@@ -82,11 +82,15 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 			if($input->post->bool('removeVariations')) {
 				// Remove srcset variations if requested
 				$count = 0;
-				$dirs = new \DirectoryIterator($this->wire()->config->paths->files);
-				foreach($dirs as $dir) {
-					if($dir->isFile() || $dir->isDot()) continue;
-					$dir = new \DirectoryIterator($dir->getPathname());
-					foreach($dir as $file) {
+				$filesPath = $this->wire()->config->paths->files;
+				if(is_dir($filesPath)) {
+					// Recursive so this also works when $config->pagefileExtendedPaths is enabled
+					// (nested subdirectories), where the old single-level iterator missed files.
+					$rii = new \RecursiveIteratorIterator(
+						new \RecursiveDirectoryIterator($filesPath, \FilesystemIterator::SKIP_DOTS)
+					);
+					foreach($rii as $file) {
+						if(!$file->isFile()) continue;
 						if(strpos($file->getFilename(), '-' . self::suffix . '.') !== false) {
 							$count++;
 							$this->wire()->files->unlink($file->getPathname());
@@ -312,9 +316,10 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 		$options = $event->arguments(1);
 		if(is_null($options) && !is_string($markup)) $options = $markup;
 		if($options === false) {
-			$this->useLazy = false;
-			$this->usePicture = false;
-			$this->webp = false;
+			// Disable augmentation for this call only.
+			// $event->return already holds the unmodified core render() output,
+			// so just return without mutating shared module state (which would
+			// otherwise leak into every image rendered later in the same request).
 			return;
 		}
 		if(!is_array($options)) $options = [];
@@ -348,7 +353,6 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 		if(!empty($options['width']) || !empty($options['height'])) {
 			$w = $options['width'] ?? 0;
 			$h = $options['height'] ?? 0;
-			$original = $image;
 			$image = $image->size((int) $w, (int) $h, $options);
 		}
 
@@ -529,10 +533,18 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 			$srcset[$rule ?? ($width ?: $height) . 'w'] = [$width, $height];
 		}
 
-		if(count($errors) && !($input->post['defaultSets'] && count($input->post['defaultSets']) !== count($srcset))) {
+		if(count($errors)) {
 			// Do not display errors when set rules are initially edited in the module config
-			foreach($errors as $error) {
-				$this->error(sprintf($this->_('%s is not a valid set rule.'), $error));
+			// (compare posted lines vs successfully parsed sets - must use the textarea
+			// sanitizer and an array, since count() on the raw string value fatals on PHP8)
+			$postedDefaultSets = $input->post->textarea('defaultSets');
+			$postedLines = $postedDefaultSets ?
+				array_filter(array_map('trim', explode("\n", str_replace(',', "\n", $postedDefaultSets)))) :
+				[];
+			if(!(count($postedLines) && count($postedLines) !== count($srcset))) {
+				foreach($errors as $error) {
+					$this->error(sprintf($this->_('%s is not a valid set rule.'), $error));
+				}
 			}
 		}
 

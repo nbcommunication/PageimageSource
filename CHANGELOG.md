@@ -1,6 +1,15 @@
 # Changelog
 
 
+## 1.0.5
+
+### Fixed
+- Fixed a fatal TypeError (PHP8+) in `getSrcset()` caused by calling `count()` on a non-array POST value when displaying invalid set rule errors.
+- Fixed `Pageimage::render(false)` permanently disabling `useLazy`/`usePicture`/`webp` for the rest of the request instead of only for the current call.
+- `removeVariations` now scans recursively so it also works correctly when `$config->pagefileExtendedPaths` is enabled.
+- Removed an unused variable in `render()`.
+
+
 ## 1.0.4 (October 6, 2022)
 
 ### Added
