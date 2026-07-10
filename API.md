@@ -121,12 +121,12 @@ echo $image->render(false);
 echo $image->render($markup, false);
 ```
 
-Internally this now (as of the bugfix migration applied 2026-07) simply
-returns without modifying the returned markup, and does **not** mutate the
-module's `useLazy`/`usePicture`/`webp` instance properties. Prior to that fix,
-calling `render(false)` anywhere in a request would permanently disable lazy
+Internally this simply returns without modifying the returned markup, and
+does **not** mutate the module's `useLazy`/`usePicture`/`webp` instance
+properties. Note: in older/unpatched copies of this module, calling
+`render(false)` anywhere in a request would permanently disable lazy
 loading, `<picture>`, and WebP for all subsequent `render()` calls in that
-same request — worth knowing if working with an unpatched copy of the module.
+same request — see CHANGELOG for details if working with an older version.
 
 Non-JPEG/PNG images (anything not `jpeg`/`jpg`/`png`) never get WebP applied regardless of config.
 
