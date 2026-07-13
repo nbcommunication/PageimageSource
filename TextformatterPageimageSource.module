@@ -128,14 +128,14 @@ class TextformatterPageimageSource extends Textformatter implements Module {
 
 					$imageFields = [];
 
-					foreach($p->template->fieldgroup as $field) {
-						if(!$field->type instanceof FieldtypeImage) continue;
-						$v = $p->get($field->name);
+					foreach($p->template->fieldgroup as $f) {
+						if(!$f->type instanceof FieldtypeImage) continue;
+						$v = $p->get($f->name);
 						if(empty($v)) continue;
 						if($v instanceof Pageimage) $v = $v->pagefiles;
 						if(!$v instanceof Pageimages) continue;
 						if(!$v->count()) continue;
-						$imageFields[$field->name] = $v;
+						$imageFields[$f->name] = $v;
 					}
 
 					$this->imageFields[$p->id] = $imageFields;

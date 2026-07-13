@@ -5,7 +5,7 @@
  *
  * #pw-summary Extends Pageimage with a srcset property/method plus additional rendering options.
  *
- * @copyright 2025 NB Communication Ltd
+ * @copyright 2026 NB Communication Ltd
  * @license Mozilla Public License v2.0 http://mozilla.org/MPL/2.0/
  *
  * @property string $defaultSets
@@ -29,7 +29,7 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 	public static function getModuleInfo() {
 		return [
 			'title' => 'Pageimage Source',
-			'version' => 115,
+			'version' => 120,
 			'summary' => 'Extends Pageimage with a srcset property/method and additional rendering options.',
 			'author' => 'nbcommunication',
 			'href' => 'https://github.com/nbcommunication/PageimageSource',
@@ -81,19 +81,7 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 
 			if($input->post->bool('removeVariations')) {
 				// Remove srcset variations if requested
-				$count = 0;
-				$dirs = new \DirectoryIterator($this->wire()->config->paths->files);
-				foreach($dirs as $dir) {
-					if($dir->isFile() || $dir->isDot()) continue;
-					$dir = new \DirectoryIterator($dir->getPathname());
-					foreach($dir as $file) {
-						if(strpos($file->getFilename(), '-' . self::suffix . '.') !== false) {
-							$count++;
-							$this->wire()->files->unlink($file->getPathname());
-						}
-					}
-				}
-
+				$count = $this->removeVariations();
 				$input->post->removeVariations = 0;
 				if($count) $this->message(sprintf($this->_('%d variations removed'), $count));
 			}
@@ -111,14 +99,6 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 
 		// Pageimage::render
 		$this->addHookAfter('Pageimage::render', $this, 'render');
-	}
-
-	/**
-	 * When ProcessWire is ready
-	 *
-	 */
-	public function ready() {
-
 	}
 
 	/**
@@ -143,16 +123,24 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 		$image = $event->object;
 		$srcset = $event->arguments(0);
 		$options = $event->arguments(1);
-		$property = [
-			'srcset' => $this->webp ? 'webpUrl' : 'url',
-			'httpSrcset' => 'httpUrl',
-			'SRCSET' => 'URL',
-			'HTTPSRCSET' => 'HTTPURL',
-		][$event->method];
 
 		// Handle shortcuts
 		if(!is_array($srcset) && !is_string($srcset)) $srcset = $this->srcset;
 		if(!is_array($options)) $options = [];
+
+		// Allow an explicit 'webp' option to override the module's $this->webp setting
+		// for this call only (used by Pageimage::render()'s <picture> markup, which
+		// needs to request both webp and non-webp variants of the same srcset without
+		// mutating any shared module state).
+		$webp = array_key_exists('webp', $options) ? (bool) $options['webp'] : (bool) $this->webp;
+		unset($options['webp']);
+
+		$property = [
+			'srcset' => $webp ? 'webpUrl' : 'url',
+			'httpSrcset' => 'httpUrl',
+			'SRCSET' => 'URL',
+			'HTTPSRCSET' => 'HTTPURL',
+		][$event->method];
 
 		// Get srcset config
 		$srcset = $this->getSrcset($srcset);
@@ -162,7 +150,7 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 			'allSets' => (bool) $this->allSets,
 			'suffix' => self::suffix,
 			'upscaling' => false,
-			'webpAdd' => $this->webp,
+			'webpAdd' => $webp,
 		], $options);
 
 		if($this->webpQuality && !isset($options['webpQuality'])) {
@@ -194,64 +182,9 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 			$cropWidth = $sanitizer->int($dimensions[0]);
 			$cropHeight = $sanitizer->int($dimensions[1] ?? 0);
 
-			$img = null;
-			if(($cropWidth || $cropHeight) && (($cropWidth && $imageWidth > $cropWidth) || ($cropHeight && $imageHeight > $cropHeight))) {
-
-				if(!$options['upscaling']) {
-					if($imageWidth && $cropWidth > $imageWidth) {
-						$cropWidth = $imageWidth;
-					}
-					if($imageHeight && $cropHeight > $imageHeight) {
-						$cropHeight = $imageHeight;
-					}
-				}
-
-				if($variation && (!$cropWidth || !$cropHeight)) {
-
-					$ratioHeight = round($cropWidth / $ratio);
-					if($imageHeight && $ratioHeight > $imageHeight) {
-						$ratioHeight = $imageHeight;
-					}
-
-					if($imageWidth && $imageHeight) {
-
-						if(!$cropWidth) {
-							$cropWidth = $cropHeight;
-							$cropHeight = round($cropHeight / $ratio);
-						}
-
-						if($imageWidth > $cropWidth) {
-							$img = $image->size($cropWidth, $cropHeight ?: $ratioHeight, $options);
-						} else {
-							$img = $event->object;
-						}
-
-					} else if($imageHeight && !$imageWidth) {
-
-						if($imageHeight > $cropHeight && $imageHeight > $cropWidth) {
-							$img = $image->height($cropHeight ?: $cropWidth, $options);
-						} else {
-							$img = $event->object;
-							$break = true;
-						}
-					}
-				}
-
-				if(is_null($img) && (
-					($cropWidth && $image->width > $cropWidth) ||
-					($cropHeight && $image->height > $cropHeight)
-				)) {
-					$img = $image->size($cropWidth, $cropHeight, $options);
-				}
-
-			} else if($options['allSets'] && $options['upscaling'] && $cropWidth && $cropHeight) {
-
-				$img = $image->size($cropWidth, $cropHeight, $options);
-
-			} else if($cropHeight && $imageHeight > $cropHeight) {
-
-				$img = $image->height($cropHeight, $options);
-			}
+			$resolved = $this->resolveSetImage($event, $image, $imageWidth, $imageHeight, $ratio, $variation, $options, $cropWidth, $cropHeight);
+			$img = $resolved['image'];
+			if($resolved['break']) $break = true;
 
 			if(is_null($img)) {
 
@@ -274,6 +207,7 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 
 		$event->return = count($sets) ? implode(', ', $sets) : '';
 	}
+
 
 	/**
 	 * Return a srcset config array
@@ -312,9 +246,10 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 		$options = $event->arguments(1);
 		if(is_null($options) && !is_string($markup)) $options = $markup;
 		if($options === false) {
-			$this->useLazy = false;
-			$this->usePicture = false;
-			$this->webp = false;
+			// Disable augmentation for this call only.
+			// $event->return already holds the unmodified core render() output,
+			// so just return without mutating shared module state (which would
+			// otherwise leak into every image rendered later in the same request).
 			return;
 		}
 		if(!is_array($options)) $options = [];
@@ -328,27 +263,32 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 			'useSrcUrlOnSize' => false,
 		], $options);
 
-		$_webp = $this->webp;
-		if(!in_array($image->ext, ['jpeg', 'jpg', 'png'])) $this->webp = false;
+		// Use a local $useWebp flag rather than mutating the shared $this->webp module
+		// property for the duration of this call - previously this method saved/restored
+		// $this->webp in three separate places (here, inside the $_getSrcset closure, and
+		// at the end of the method), which was fragile and easy to break during a future
+		// edit. getImageSrcset() now accepts an explicit 'webp' option override so no
+		// module state needs to be mutated at all.
+		$useWebp = (bool) $this->webp;
+		if(!in_array($image->ext, ['jpeg', 'jpg', 'png'])) $useWebp = false;
 
-		if($this->webp && $this->webpQuality) {
+		if($useWebp && $this->webpQuality) {
 			$config->webpOptions('quality', $this->webpQuality);
 		}
 
-		if($options['useSrcUrlOnSize'] && strpos($image->webp()->url, '.webp') === false) $this->webp = false;
+		if($options['useSrcUrlOnSize'] && strpos($image->webp()->url, '.webp') === false) $useWebp = false;
 
 		if(is_array($options['sizes'])) {
 			$options['sizes'] = implode(', ', $options['sizes']);
 		}
 
-		if(!$this->webp) $options['picture'] = false;
+		if(!$useWebp) $options['picture'] = false;
 		if($options['lazy']) $options['lazy'] = 'lazy';
 
 		// Get resized image if width/height passed in options
 		if(!empty($options['width']) || !empty($options['height'])) {
 			$w = $options['width'] ?? 0;
 			$h = $options['height'] ?? 0;
-			$original = $image;
 			$image = $image->size((int) $w, (int) $h, $options);
 		}
 
@@ -365,25 +305,32 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 			return strpos($img, "$a=") !== false;
 		};
 
-		$_getSrcset = function($webp = null) use ($config, $image, $options) {
-			$_webp = $this->webp;
+		$_getSrcset = function($webp = null) use ($config, $image, $options, $useWebp) {
+			// Resolve the webp flag for this call: an explicit true/false argument
+			// (used by the <picture> branch below to force each <source>) takes
+			// precedence, otherwise fall back to the locally-resolved $useWebp.
+			// This is passed through explicitly as a 'webp' srcset option rather
+			// than temporarily mutating $this->webp on the module instance.
+			$effectiveWebp = is_bool($webp) ? $webp : $useWebp;
 			$webpOptions = $config->webpOptions();
 			if(is_bool($webp)) {
 				$config->webpOptions([
 					'useSrcUrlOnSize' => false,
 					'useSrcUrlOnFail' => false,
 				]);
-				$this->webp = $webp;
 			}
 			$srcset = '';
 			if($options['srcset'] !== false) {
 				if(is_array($options['srcset']) && $this->isArrayAssociative($options['srcset'])) {
-					$srcset = $image->srcset($options['srcset']['rules'] ?? null, $options['srcset']['options'] ?? []);
+					$rules = $options['srcset']['rules'] ?? null;
+					$srcsetOptions = $options['srcset']['options'] ?? [];
 				} else {
-					$srcset = $image->srcset($options['srcset']);
+					$rules = $options['srcset'];
+					$srcsetOptions = [];
 				}
+				$srcsetOptions['webp'] = $effectiveWebp;
+				$srcset = $image->srcset($rules, $srcsetOptions);
 			}
-			$this->webp = $_webp;
 			$config->webpOptions($webpOptions);
 			return $srcset;
 		};
@@ -445,12 +392,10 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 				'<source ' . $attrs . ' type="image/' .($image->ext === 'jpg' ? 'jpeg' : $image->ext) . '">' .
 			"{$img}</picture>";
 
-		} else if($this->webp) {
+		} else if($useWebp) {
 
 			$img = str_replace($image->url, $image->webpUrl, $img);
 		}
-
-		$this->webp = $_webp;
 
 		// Render additional attributes
 		$event->return = $img;
@@ -480,6 +425,7 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 
 		$srcset = [];
 		$errors = [];
+		$validCount = 0;
 		foreach($sets as $line) {
 
 			$line = trim($line);
@@ -526,13 +472,25 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 				continue;
 			}
 
+			$validCount++;
 			$srcset[$rule ?? ($width ?: $height) . 'w'] = [$width, $height];
 		}
 
-		if(count($errors) && !($input->post['defaultSets'] && count($input->post['defaultSets']) !== count($srcset))) {
+		if(count($errors)) {
 			// Do not display errors when set rules are initially edited in the module config
-			foreach($errors as $error) {
-				$this->error(sprintf($this->_('%s is not a valid set rule.'), $error));
+			// (compare posted lines vs a non-deduplicated count of successfully parsed lines,
+			// NOT count($srcset) - $srcset is keyed/deduplicated by rule, so duplicate valid
+			// rules would otherwise mask a genuinely invalid line, e.g. "320", "320", "bogus"
+			// produces 3 posted lines but only 1 unique srcset entry. Must use the textarea
+			// sanitizer and an array, since count() on the raw string value fatals on PHP8)
+			$postedDefaultSets = $input->post->textarea('defaultSets');
+			$postedLines = $postedDefaultSets ?
+				array_filter(array_map('trim', explode("\n", str_replace(',', "\n", $postedDefaultSets)))) :
+				[];
+			if(!(count($postedLines) && count($postedLines) !== $validCount)) {
+				foreach($errors as $error) {
+					$this->error(sprintf($this->_('%s is not a valid set rule.'), $error));
+				}
 			}
 		}
 
@@ -551,5 +509,148 @@ class PageimageSource extends WireData implements Module, ConfigurableModule {
 	private function isArrayAssociative(array $array) {
 		if(array() === $array) return false;
 		return array_keys($array) !== range(0, count($array) - 1);
+	}
+
+	/**
+	 * Remove all srcset variation files generated by this module
+	 *
+	 * Recursive so this also works when $config->pagefileExtendedPaths is enabled
+	 * (nested subdirectories). Used both by the "Remove Variations" module config
+	 * checkbox and automatically on module uninstall, so generated variations don't
+	 * accumulate as orphaned files once the module is no longer generating/using them.
+	 *
+	 * #pw-internal
+	 *
+	 * @return int Number of files removed
+	 *
+	 */
+	protected function removeVariations() {
+		$count = 0;
+		$filesPath = $this->wire()->config->paths->files;
+		if(is_dir($filesPath)) {
+			$rii = new \RecursiveIteratorIterator(
+				new \RecursiveDirectoryIterator($filesPath, \FilesystemIterator::SKIP_DOTS)
+			);
+			foreach($rii as $file) {
+				if(!$file->isFile()) continue;
+				if(strpos($file->getFilename(), '-' . self::suffix . '.') !== false) {
+					$count++;
+					$this->wire()->files->unlink($file->getPathname());
+				}
+			}
+		}
+		return $count;
+	}
+
+	/**
+	 * Resolve the appropriately sized image for a single srcset rule
+	 *
+	 * Extracted from ___getImageSrcset() to isolate the per-rule sizing decision, which
+	 * involves several interacting conditions (upscaling, image variations, width vs
+	 * height driven crops). This is a refactor only - behaviour is unchanged from the
+	 * original inline implementation, including the loop-control side effect described
+	 * in the $break return value below.
+	 *
+	 * #pw-internal
+	 *
+	 * @param HookEvent $event The srcset hook event (used for its ->object fallback)
+	 * @param Pageimage $image The source image (the original, if $variation is set)
+	 * @param int $imageWidth Width to size from (variation width, if applicable)
+	 * @param int $imageHeight Height to size from (variation height, if applicable)
+	 * @param float $ratio Width/height ratio of $imageWidth/$imageHeight
+	 * @param array|bool $variation Result of Pageimage::isVariation(), or false
+	 * @param array $options Size options to pass through to size()/height()
+	 * @param int $cropWidth Requested width for this rule (may be reduced if upscaling is disabled)
+	 * @param int $cropHeight Requested height for this rule (may be reduced if upscaling is disabled)
+	 * @return array [
+	 *   'image' => Pageimage|null Resized image, or null if the caller should fall back
+	 *     to the original image resized with $options applied,
+	 *   'break' => bool|null Whether the calling loop's $break flag should be forced true
+	 *     (only ever true for the case where the image has a height but no width, and the
+	 *     requested crop exceeds the available height); null means no change to $break.
+	 * ]
+	 *
+	 */
+	protected function resolveSetImage(HookEvent $event, Pageimage $image, $imageWidth, $imageHeight, $ratio, $variation, array $options, $cropWidth, $cropHeight) {
+
+		$img = null;
+		$break = null;
+
+		if(($cropWidth || $cropHeight) && (($cropWidth && $imageWidth > $cropWidth) || ($cropHeight && $imageHeight > $cropHeight))) {
+
+			if(!$options['upscaling']) {
+				if($imageWidth && $cropWidth > $imageWidth) {
+					$cropWidth = $imageWidth;
+				}
+				if($imageHeight && $cropHeight > $imageHeight) {
+					$cropHeight = $imageHeight;
+				}
+			}
+
+			if($variation && (!$cropWidth || !$cropHeight)) {
+
+				$ratioHeight = round($cropWidth / $ratio);
+				if($imageHeight && $ratioHeight > $imageHeight) {
+					$ratioHeight = $imageHeight;
+				}
+
+				if($imageWidth && $imageHeight) {
+
+					if(!$cropWidth) {
+						$cropWidth = $cropHeight;
+						$cropHeight = round($cropHeight / $ratio);
+					}
+
+					if($imageWidth > $cropWidth) {
+						$img = $image->size($cropWidth, $cropHeight ?: $ratioHeight, $options);
+					} else {
+						$img = $event->object;
+					}
+
+				} else if($imageHeight && !$imageWidth) {
+
+					if($imageHeight > $cropHeight && $imageHeight > $cropWidth) {
+						$img = $image->height($cropHeight ?: $cropWidth, $options);
+					} else {
+						$img = $event->object;
+						$break = true;
+					}
+				}
+			}
+
+			if(is_null($img) && (
+				($cropWidth && $image->width > $cropWidth) ||
+				($cropHeight && $image->height > $cropHeight)
+			)) {
+				$img = $image->size($cropWidth, $cropHeight, $options);
+			}
+
+		} else if($options['allSets'] && $options['upscaling'] && $cropWidth && $cropHeight) {
+
+			$img = $image->size($cropWidth, $cropHeight, $options);
+
+		} else if($cropHeight && $imageHeight > $cropHeight) {
+
+			$img = $image->height($cropHeight, $options);
+		}
+
+		return ['image' => $img, 'break' => $break];
+	}
+
+	/**
+	 * Called when the module is uninstalled
+	 *
+	 * Removes any srcset variation files this module has generated, so they don't
+	 * remain behind as orphaned files once the module is no longer present to
+	 * regenerate or manage them.
+	 *
+	 * #pw-internal
+	 *
+	 */
+	public function ___uninstall() {
+		$count = $this->removeVariations();
+		if($count) {
+			$this->message(sprintf($this->_('%d srcset variations removed'), $count));
+		}
 	}
 }
